@@ -424,8 +424,10 @@
 <script>
   // Telegram WebApp init
   const tg = window.Telegram?.WebApp;
-  if (tg) tg.ready();
-  if (tg) tg.expand();
+  if (tg) {
+    tg.ready();
+    tg.expand?.();
+  }
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
@@ -486,13 +488,20 @@
 
     console.log('[MINIAPP] startScanning');
     debugLog('[MINIAPP] startScanning');
+    debugLog('[MINIAPP] tg exists: ' + (!!tg));
+    debugLog('[MINIAPP] tg version: ' + (tg?.version ?? 'undefined'));
+    debugLog('[MINIAPP] tg platform: ' + (tg?.platform ?? 'undefined'));
+    debugLog('[MINIAPP] typeof showScanQrPopup: ' + typeof tg?.showScanQrPopup);
+    debugLog('[MINIAPP] typeof openLink: ' + typeof tg?.openLink);
 
     if (!tg) {
+      debugLog('[MINIAPP] Telegram WebApp недоступен');
       alert('Telegram WebApp недоступен');
       return;
     }
 
     if (!tg.showScanQrPopup) {
+      debugLog('[MINIAPP] showScanQrPopup недоступен');
       alert('Метод showScanQrPopup недоступен');
       return;
     }
@@ -501,19 +510,25 @@
     idleSection.style.display = 'none';
     setStatus('Наведи на QR-код');
 
-    tg.showScanQrPopup(
-      { text: 'Наведи на QR-код' },
-      (qrText) => {
-        console.log('[MINIAPP] QR detected:', qrText);
-        debugLog('[MINIAPP] QR detected: ' + qrText);
+    try {
+      debugLog('[MINIAPP] calling showScanQrPopup');
+      tg.showScanQrPopup(
+        { text: 'Наведи на QR-код' },
+        (qrText) => {
+          debugLog('[MINIAPP] showScanQrPopup callback: ' + qrText);
+          console.log('[MINIAPP] QR detected:', qrText);
+          debugLog('[MINIAPP] QR detected: ' + qrText);
 
-        if (!qrText) return;
+          if (!qrText) return;
 
-        console.log('[MINIAPP] sending request');
-        tg.closeScanQrPopup?.();
-        handleSBP(qrText);
-      }
-    );
+          console.log('[MINIAPP] sending request');
+          tg.closeScanQrPopup?.();
+          handleSBP(qrText);
+        }
+      );
+    } catch (err) {
+      debugLog('[MINIAPP] showScanQrPopup threw: ' + (err?.message || String(err)));
+    }
   }
 
   function stopScanning() {
