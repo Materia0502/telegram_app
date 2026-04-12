@@ -378,7 +378,7 @@
   </div>
 
   <!-- Scan button -->
-  <button class="scan-btn" id="scan-btn" onclick="startScan()">
+  <button class="scan-btn" id="scanBtn">
     <svg viewBox="0 0 24 24">
       <path d="M23 7V2h-5"/>
       <path d="M1 7V2h5"/>
@@ -424,17 +424,15 @@
 <script>
   // Telegram WebApp init
   const tg = window.Telegram?.WebApp;
-  if (tg) {
-    tg.ready();
-    tg.expand();
-  }
+  if (tg) tg.ready();
+  if (tg) tg.expand();
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
   const SERVER_URL = 'https://break-issued-conversation-securities.trycloudflare.com';
 
   // DOM refs
-  const scanBtn        = document.getElementById('scan-btn');
+  const scanBtn        = document.getElementById('scanBtn');
   const scanBtnText    = document.getElementById('scan-btn-text');
   const btnSpinner     = document.getElementById('btn-spinner');
   const cameraSection  = document.getElementById('camera-section');
@@ -484,32 +482,38 @@
 
   // Telegram QR scan
   function startScan() {
-    const tg = window.Telegram.WebApp;
+    const tg = window.Telegram?.WebApp;
 
     console.log('[MINIAPP] startScanning');
     debugLog('[MINIAPP] startScanning');
+
+    if (!tg) {
+      alert('Telegram WebApp недоступен');
+      return;
+    }
+
+    if (!tg.showScanQrPopup) {
+      alert('Метод showScanQrPopup недоступен');
+      return;
+    }
 
     resultCard.classList.remove('visible');
     idleSection.style.display = 'none';
     setStatus('Наведи на QR-код');
 
-    if (!tg?.showScanQrPopup) {
-      setStatus('Сканер Telegram недоступен', 'error');
-      return;
-    }
+    tg.showScanQrPopup(
+      { text: 'Наведи на QR-код' },
+      (qrText) => {
+        console.log('[MINIAPP] QR detected:', qrText);
+        debugLog('[MINIAPP] QR detected: ' + qrText);
 
-    tg.showScanQrPopup({
-      text: 'Наведи на QR-код'
-    }, (qrText) => {
-      console.log('[MINIAPP] QR detected:', qrText);
-      debugLog('[MINIAPP] QR detected: ' + qrText);
+        if (!qrText) return;
 
-      if (!qrText) return false;
-
-      tg.closeScanQrPopup?.();
-      handleSBP(qrText);
-      return true;
-    });
+        console.log('[MINIAPP] sending request');
+        tg.closeScanQrPopup?.();
+        handleSBP(qrText);
+      }
+    );
   }
 
   function stopScanning() {
@@ -576,6 +580,7 @@
   }
 
   // Init
+  document.getElementById('scanBtn').onclick = startScan;
   setStatus('Нажмите кнопку, чтобы начать сканирование');
 </script>
 </body>
