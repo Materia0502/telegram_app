@@ -495,13 +495,13 @@
     debugLog('[MINIAPP] startScanning');
 
     if (!tg) {
-      debugLog('[MINIAPP] Telegram WebApp недоступен');
+      debugLog('[MINIAPP] Telegram WebApp unavailable');
       alert('Telegram WebApp недоступен');
       return;
     }
 
     if (!tg.showScanQrPopup) {
-      debugLog('[MINIAPP] showScanQrPopup недоступен');
+      debugLog('[MINIAPP] showScanQrPopup unavailable');
       alert('Метод showScanQrPopup недоступен');
       return;
     }
