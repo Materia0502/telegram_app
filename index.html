@@ -428,6 +428,11 @@
     tg.ready();
     tg.expand?.();
   }
+  debugLog('[MINIAPP] tg exists: ' + (!!tg));
+  debugLog('[MINIAPP] tg version: ' + (tg?.version ?? 'undefined'));
+  debugLog('[MINIAPP] tg platform: ' + (tg?.platform ?? 'undefined'));
+  debugLog('[MINIAPP] typeof showScanQrPopup: ' + typeof tg?.showScanQrPopup);
+  debugLog('[MINIAPP] typeof showAlert: ' + typeof tg?.showAlert);
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
@@ -488,11 +493,6 @@
 
     console.log('[MINIAPP] startScanning');
     debugLog('[MINIAPP] startScanning');
-    debugLog('[MINIAPP] tg exists: ' + (!!tg));
-    debugLog('[MINIAPP] tg version: ' + (tg?.version ?? 'undefined'));
-    debugLog('[MINIAPP] tg platform: ' + (tg?.platform ?? 'undefined'));
-    debugLog('[MINIAPP] typeof showScanQrPopup: ' + typeof tg?.showScanQrPopup);
-    debugLog('[MINIAPP] typeof openLink: ' + typeof tg?.openLink);
 
     if (!tg) {
       debugLog('[MINIAPP] Telegram WebApp недоступен');
