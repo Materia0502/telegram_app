@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Оплата по QR</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -333,8 +332,6 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* hidden canvas for QR decoding */
-    #qr-canvas { display: none; }
   </style>
 </head>
 <body>
@@ -381,7 +378,7 @@
   </div>
 
   <!-- Scan button -->
-  <button class="scan-btn" id="scan-btn" onclick="startScanning()">
+  <button class="scan-btn" id="scan-btn" onclick="startScan()">
     <svg viewBox="0 0 24 24">
       <path d="M23 7V2h-5"/>
       <path d="M1 7V2h5"/>
@@ -424,9 +421,6 @@
 
 </div>
 
-<!-- Hidden canvas for QR decoding -->
-<canvas id="qr-canvas"></canvas>
-
 <script>
   // Telegram WebApp init
   const tg = window.Telegram?.WebApp;
@@ -438,23 +432,12 @@
   // Constants
   // заменить на актуальный URL backend (cloudflared)
   const SERVER_URL = 'https://break-issued-conversation-securities.trycloudflare.com';
-  const SBP_PATTERN = /qr\.nspk\.ru/i;
-  const SCAN_INTERVAL_MS = 200;
-
-  // State
-  let stream = null;
-  let scanTimer = null;
-  let scanning = false;
 
   // DOM refs
   const scanBtn        = document.getElementById('scan-btn');
   const scanBtnText    = document.getElementById('scan-btn-text');
   const btnSpinner     = document.getElementById('btn-spinner');
   const cameraSection  = document.getElementById('camera-section');
-  const videoEl        = document.getElementById('camera-video');
-  const videoWrapper   = document.getElementById('video-wrapper');
-  const canvas         = document.getElementById('qr-canvas');
-  const ctx            = canvas.getContext('2d');
   const statusText     = document.getElementById('status-text');
   const resultCard     = document.getElementById('result-card');
   const resultUrl      = document.getElementById('result-url');
@@ -499,98 +482,41 @@
     scanBtn.disabled         = loading;
   }
 
-  // Camera helpers
-  async function startScanning() {
-    console.log('[MINIAPP] startScanning called');
+  // Telegram QR scan
+  function startScan() {
+    const tg = window.Telegram.WebApp;
+
+    console.log('[MINIAPP] startScanning');
     debugLog('[MINIAPP] startScanning');
-    // Reset result
+
     resultCard.classList.remove('visible');
     idleSection.style.display = 'none';
-    setStatus('Запуск камеры...');
-    scanBtn.disabled = true;
-    scanning = false;
+    setStatus('Наведи на QR-код');
 
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
-      videoEl.srcObject = stream;
-      await videoEl.play();
-      console.log('[MINIAPP] camera started');
-      debugLog('[MINIAPP] camera started');
-
-      cameraSection.classList.add('active');
-      scanBtn.style.display = 'none';
-      setStatus('Наведите камеру на QR-код СБП');
-      scanning = true;
-      scanTimer = setInterval(scanFrame, SCAN_INTERVAL_MS);
-
-    } catch (err) {
-      console.error('Camera error:', err);
-      scanBtn.disabled = false;
-      idleSection.style.display = '';
-      if (err.name === 'NotAllowedError') {
-        setStatus('Нет доступа к камере. Разрешите доступ в настройках.', 'error');
-      } else {
-        setStatus('Не удалось открыть камеру: ' + err.message, 'error');
-      }
+    if (!tg?.showScanQrPopup) {
+      setStatus('Сканер Telegram недоступен', 'error');
+      return;
     }
+
+    tg.showScanQrPopup({
+      text: 'Наведи на QR-код'
+    }, (qrText) => {
+      console.log('[MINIAPP] QR detected:', qrText);
+      debugLog('[MINIAPP] QR detected: ' + qrText);
+
+      if (!qrText) return false;
+
+      tg.closeScanQrPopup?.();
+      handleSBP(qrText);
+      return true;
+    });
   }
 
   function stopScanning() {
-    scanning = false;
-    clearInterval(scanTimer);
-    scanTimer = null;
-
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    videoEl.srcObject = null;
+    tg?.closeScanQrPopup?.();
     cameraSection.classList.remove('active');
-    videoWrapper.classList.remove('scanning');
-
-    scanBtn.style.display = '';
-    scanBtn.disabled = false;
-    scanBtnText.textContent = 'Сканировать QR';
-    btnSpinner.style.display = 'none';
     idleSection.style.display = '';
     setStatus('Нажмите кнопку, чтобы начать сканирование');
-  }
-
-  // QR scan loop
-  function scanFrame() {
-    if (!scanning || videoEl.readyState < videoEl.HAVE_ENOUGH_DATA) return;
-
-    canvas.width  = videoEl.videoWidth;
-    canvas.height = videoEl.videoHeight;
-    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert'
-    });
-
-    if (code) {
-      const found = code.data;
-      console.log(`[MINIAPP] QR detected: ${found}`);
-      debugLog('[MINIAPP] QR detected: ' + found);
-      console.log('[MINIAPP] checking QR pattern');
-      debugLog('[MINIAPP] checking pattern');
-
-      if (SBP_PATTERN.test(found)) {
-        console.log('[MINIAPP] SBP QR accepted');
-        debugLog('[MINIAPP] SBP accepted');
-        // Valid SBP QR
-        scanning = false;
-        clearInterval(scanTimer);
-        videoWrapper.classList.add('scanning');
-        handleSBP(found);
-      } else {
-        setStatus('Это не QR-код СБП. Наведите на другой.', '');
-      }
-    }
   }
 
   // Payment logic
@@ -602,7 +528,7 @@
     setBtnLoading(true);
 
     try {
-      console.log('[MINIAPP] sending POST /payment/pay');
+      console.log('[MINIAPP] sending request');
       debugLog('[MINIAPP] sending request');
       const resp = await fetch(`${SERVER_URL}/payment/pay`, {
         method: 'POST',
@@ -645,13 +571,7 @@
 
   // Stop camera tracks but keep UI (for result display)
   function stopCameraKeepUI() {
-    scanning = false;
-    clearInterval(scanTimer);
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    videoEl.srcObject = null;
+    tg?.closeScanQrPopup?.();
     cameraSection.classList.remove('active');
   }
 
