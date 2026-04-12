@@ -35,7 +35,7 @@
       overflow-x: hidden;
     }
 
-    /* ── Header ── */
+    /* Header */
     .header {
       width: 100%;
       background-color: var(--tg-theme-secondary-bg-color);
@@ -78,7 +78,7 @@
       color: var(--tg-theme-hint-color);
     }
 
-    /* ── Main content ── */
+    /* Main content */
     .content {
       width: 100%;
       max-width: 480px;
@@ -90,7 +90,7 @@
       flex: 1;
     }
 
-    /* ── Idle illustration ── */
+    /* Idle illustration */
     .illustration {
       width: 140px;
       height: 140px;
@@ -116,7 +116,7 @@
       max-width: 260px;
     }
 
-    /* ── Scan button ── */
+    /* Scan button */
     .scan-btn {
       width: 100%;
       max-width: 320px;
@@ -152,7 +152,7 @@
       flex-shrink: 0;
     }
 
-    /* ── Camera section ── */
+    /* Camera section */
     .camera-section {
       display: none;
       width: 100%;
@@ -233,7 +233,7 @@
 
     .stop-btn:active { opacity: 0.7; }
 
-    /* ── Status ── */
+    /* Status */
     .status {
       font-size: 14px;
       color: var(--tg-theme-hint-color);
@@ -245,7 +245,7 @@
     .status.success { color: #4cd964; font-weight: 600; }
     .status.error   { color: #ff3b30; font-weight: 600; }
 
-    /* ── Result card ── */
+    /* Result card */
     .result-card {
       display: none;
       width: 100%;
@@ -309,7 +309,18 @@
     .result-status-text.ok  { color: #4cd964; }
     .result-status-text.err { color: #ff3b30; }
 
-    /* ── Loading spinner ── */
+    #debug-log {
+      max-height: 160px;
+      overflow-y: auto;
+      font-size: 12px;
+      background: rgba(0,0,0,0.05);
+      border-radius: 10px;
+      padding: 8px;
+      width: 100%;
+      word-break: break-word;
+    }
+
+    /* Loading spinner */
     .spinner {
       display: none;
       width: 22px;
@@ -409,30 +420,33 @@
     </div>
   </div>
 
+  <div id="debug-log"></div>
+
 </div>
 
 <!-- Hidden canvas for QR decoding -->
 <canvas id="qr-canvas"></canvas>
 
 <script>
-  // ── Telegram WebApp init ──────────────────────────────────────────
+  // Telegram WebApp init
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
     tg.expand();
   }
 
-  // ── Constants ────────────────────────────────────────────────────
-  const SERVER_URL = 'https://���_�����_URL.trycloudflare.com';
+  // Constants
+  // заменить на актуальный URL backend (cloudflared)
+  const SERVER_URL = 'https://break-issued-conversation-securities.trycloudflare.com';
   const SBP_PATTERN = /qr\.nspk\.ru/i;
   const SCAN_INTERVAL_MS = 200;
 
-  // ── State ────────────────────────────────────────────────────────
+  // State
   let stream = null;
   let scanTimer = null;
   let scanning = false;
 
-  // ── DOM refs ─────────────────────────────────────────────────────
+  // DOM refs
   const scanBtn        = document.getElementById('scan-btn');
   const scanBtnText    = document.getElementById('scan-btn-text');
   const btnSpinner     = document.getElementById('btn-spinner');
@@ -448,10 +462,18 @@
   const resultStatus   = document.getElementById('result-status-text');
   const idleSection    = document.getElementById('idle-section');
 
-  // ── UI helpers ───────────────────────────────────────────────────
+  // UI helpers
   function setStatus(msg, cls = '') {
     statusText.textContent = msg;
     statusText.className = 'status ' + cls;
+  }
+
+  function debugLog(msg) {
+    const el = document.getElementById('debug-log');
+    if (!el) return;
+    const row = document.createElement('div');
+    row.textContent = msg;
+    el.prepend(row);
   }
 
   function showResult(url, success, message) {
@@ -477,12 +499,14 @@
     scanBtn.disabled         = loading;
   }
 
-  // ── Camera helpers ───────────────────────────────────────────────
+  // Camera helpers
   async function startScanning() {
+    console.log('[MINIAPP] startScanning called');
+    debugLog('[MINIAPP] startScanning');
     // Reset result
     resultCard.classList.remove('visible');
     idleSection.style.display = 'none';
-    setStatus('Запуск камеры…');
+    setStatus('Запуск камеры...');
     scanBtn.disabled = true;
     scanning = false;
 
@@ -493,6 +517,8 @@
       });
       videoEl.srcObject = stream;
       await videoEl.play();
+      console.log('[MINIAPP] camera started');
+      debugLog('[MINIAPP] camera started');
 
       cameraSection.classList.add('active');
       scanBtn.style.display = 'none';
@@ -533,7 +559,7 @@
     setStatus('Нажмите кнопку, чтобы начать сканирование');
   }
 
-  // ── QR scan loop ─────────────────────────────────────────────────
+  // QR scan loop
   function scanFrame() {
     if (!scanning || videoEl.readyState < videoEl.HAVE_ENOUGH_DATA) return;
 
@@ -548,9 +574,14 @@
 
     if (code) {
       const found = code.data;
-      console.log('QR detected:', found);
+      console.log(`[MINIAPP] QR detected: ${found}`);
+      debugLog('[MINIAPP] QR detected: ' + found);
+      console.log('[MINIAPP] checking QR pattern');
+      debugLog('[MINIAPP] checking pattern');
 
       if (SBP_PATTERN.test(found)) {
+        console.log('[MINIAPP] SBP QR accepted');
+        debugLog('[MINIAPP] SBP accepted');
         // Valid SBP QR
         scanning = false;
         clearInterval(scanTimer);
@@ -562,22 +593,30 @@
     }
   }
 
-  // ── Payment logic ─────────────────────────────────────────────────
+  // Payment logic
   async function handleSBP(url) {
+    console.log(`[MINIAPP] handleSBP called: ${url}`);
+    debugLog('[MINIAPP] handleSBP');
     stopCameraKeepUI();
-    setStatus('QR распознан. Отправка на сервер…');
+    setStatus('QR распознан. Отправка на сервер...');
     setBtnLoading(true);
 
     try {
+      console.log('[MINIAPP] sending POST /payment/pay');
+      debugLog('[MINIAPP] sending request');
       const resp = await fetch(`${SERVER_URL}/payment/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrUrl: url })
       });
+      console.log(`[MINIAPP] response status: ${resp.status}`);
+      debugLog('[MINIAPP] response ' + resp.status);
 
-      if (resp.ok) {
-        showResult(url, true, 'Оплата выполнена');
-        setStatus('', 'success');
+      const data = await resp.json().catch(() => ({}));
+
+      if (resp.ok && data.paymentId) {
+        showResult(url, true, 'Оплата запущена');
+        setStatus('Оплата запущена', 'success');
 
         // Telegram MainButton
         if (tg?.MainButton) {
@@ -586,13 +625,15 @@
           tg.MainButton.onClick(() => tg.close());
         }
       } else {
-        const body = await resp.text().catch(() => '');
-        showResult(url, false, `Ошибка сервера (${resp.status})`);
-        setStatus('Сервер вернул ошибку', 'error');
+        const errorMessage = data.error || 'Ошибка сервера';
+        showResult(url, false, errorMessage);
+        setStatus(errorMessage, 'error');
       }
     } catch (err) {
       console.error('Payment error:', err);
-      showResult(url, false, 'Нет связи с сервером');
+      console.log('[MINIAPP] payment error');
+      debugLog('[MINIAPP] network error');
+      showResult(url, false, 'Ошибка сети');
       setStatus('Ошибка сети', 'error');
     }
 
@@ -614,7 +655,7 @@
     cameraSection.classList.remove('active');
   }
 
-  // ── Init ──────────────────────────────────────────────────────────
+  // Init
   setStatus('Нажмите кнопку, чтобы начать сканирование');
 </script>
 </body>
