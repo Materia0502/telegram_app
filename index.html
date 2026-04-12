@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Оплата по QR</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -437,18 +438,28 @@
   // Constants
   // заменить на актуальный URL backend (cloudflared)
   const SERVER_URL = 'https://break-issued-conversation-securities.trycloudflare.com';
+  const SCAN_INTERVAL_MS = 200;
 
   // DOM refs
   const scanBtn        = document.getElementById('scanBtn');
   const scanBtnText    = document.getElementById('scan-btn-text');
   const btnSpinner     = document.getElementById('btn-spinner');
   const cameraSection  = document.getElementById('camera-section');
+  const videoEl        = document.getElementById('camera-video');
+  const videoWrapper   = document.getElementById('video-wrapper');
   const statusText     = document.getElementById('status-text');
   const resultCard     = document.getElementById('result-card');
   const resultUrl      = document.getElementById('result-url');
   const resultIcon     = document.getElementById('result-icon');
   const resultStatus   = document.getElementById('result-status-text');
   const idleSection    = document.getElementById('idle-section');
+
+  let stream = null;
+  let scanTimer = null;
+  let fallbackActive = false;
+  let barcodeDetector = null;
+  let fallbackCanvas = null;
+  let fallbackCtx = null;
 
   // UI helpers
   function setStatus(msg, cls = '') {
@@ -487,6 +498,107 @@
     scanBtn.disabled         = loading;
   }
 
+  function stopFallbackScanner() {
+    fallbackActive = false;
+    clearInterval(scanTimer);
+    scanTimer = null;
+
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+    }
+
+    videoEl.srcObject = null;
+    videoWrapper.classList.remove('scanning');
+  }
+
+  function onQrDetected(qrText) {
+    if (!qrText || !fallbackActive) return;
+
+    debugLog('[MINIAPP] QR detected: ' + qrText);
+    stopFallbackScanner();
+    cameraSection.classList.remove('active');
+    scanBtn.style.display = '';
+    handleSBP(qrText);
+  }
+
+  function scanWithBarcodeDetector() {
+    if (!fallbackActive || !barcodeDetector || videoEl.readyState < videoEl.HAVE_ENOUGH_DATA) return;
+
+    barcodeDetector.detect(videoEl).then((codes) => {
+      if (!fallbackActive) return;
+
+      if (codes.length > 0) {
+        const qrText = codes[0].rawValue;
+        debugLog('[MINIAPP] BarcodeDetector QR detected: ' + qrText);
+        onQrDetected(qrText);
+      }
+    }).catch((err) => {
+      debugLog('[MINIAPP] BarcodeDetector error: ' + (err?.message || String(err)));
+    });
+  }
+
+  function scanWithJsQr() {
+    if (!fallbackActive || videoEl.readyState < videoEl.HAVE_ENOUGH_DATA) return;
+
+    if (!fallbackCanvas) {
+      fallbackCanvas = document.createElement('canvas');
+      fallbackCtx = fallbackCanvas.getContext('2d', { willReadFrequently: true });
+    }
+
+    fallbackCanvas.width = videoEl.videoWidth;
+    fallbackCanvas.height = videoEl.videoHeight;
+    fallbackCtx.drawImage(videoEl, 0, 0, fallbackCanvas.width, fallbackCanvas.height);
+
+    const imageData = fallbackCtx.getImageData(0, 0, fallbackCanvas.width, fallbackCanvas.height);
+    const code = window.jsQR?.(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: 'attemptBoth'
+    });
+
+    if (code?.data) {
+      debugLog('[MINIAPP] jsQR detected: ' + code.data);
+      onQrDetected(code.data);
+    }
+  }
+
+  async function fallbackStartCameraScan() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+
+      videoEl.srcObject = stream;
+      await videoEl.play();
+
+      fallbackActive = true;
+      cameraSection.classList.add('active');
+      videoWrapper.classList.add('scanning');
+      scanBtn.style.display = 'none';
+      idleSection.style.display = 'none';
+      setStatus('Наведите камеру на QR-код СБП');
+
+      debugLog('[MINIAPP] fallback camera started');
+      debugLog('[MINIAPP] BarcodeDetector available: ' + (typeof window.BarcodeDetector !== 'undefined'));
+
+      if (typeof window.BarcodeDetector !== 'undefined') {
+        barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        scanTimer = setInterval(scanWithBarcodeDetector, SCAN_INTERVAL_MS);
+      } else {
+        barcodeDetector = null;
+        debugLog('[MINIAPP] jsQR fallback active');
+        scanTimer = setInterval(scanWithJsQr, SCAN_INTERVAL_MS);
+      }
+    } catch (err) {
+      debugLog('[MINIAPP] fallback camera error: ' + (err?.message || String(err)));
+      setStatus('Не удалось открыть камеру: ' + (err?.message || 'unknown error'), 'error');
+      stopFallbackScanner();
+      cameraSection.classList.remove('active');
+      scanBtn.style.display = '';
+      idleSection.style.display = '';
+    }
+  }
+
   // Telegram QR scan
   function startScan() {
     const tg = window.Telegram?.WebApp;
@@ -494,21 +606,16 @@
     console.log('[MINIAPP] startScanning');
     debugLog('[MINIAPP] startScanning');
 
-    if (!tg) {
-      debugLog('[MINIAPP] Telegram WebApp unavailable');
-      alert('Telegram WebApp недоступен');
-      return;
-    }
-
-    if (!tg.showScanQrPopup) {
-      debugLog('[MINIAPP] showScanQrPopup unavailable');
-      alert('Метод showScanQrPopup недоступен');
-      return;
-    }
-
     resultCard.classList.remove('visible');
     idleSection.style.display = 'none';
     setStatus('Наведи на QR-код');
+    debugLog('[MINIAPP] trying telegram scanner');
+
+    if (!tg?.showScanQrPopup) {
+      debugLog('[MINIAPP] telegram scanner unsupported');
+      fallbackStartCameraScan();
+      return;
+    }
 
     try {
       debugLog('[MINIAPP] calling showScanQrPopup');
@@ -521,19 +628,22 @@
 
           if (!qrText) return;
 
-          console.log('[MINIAPP] sending request');
           tg.closeScanQrPopup?.();
           handleSBP(qrText);
         }
       );
     } catch (err) {
       debugLog('[MINIAPP] showScanQrPopup threw: ' + (err?.message || String(err)));
+      debugLog('[MINIAPP] telegram scanner unsupported');
+      fallbackStartCameraScan();
     }
   }
 
   function stopScanning() {
     tg?.closeScanQrPopup?.();
+    stopFallbackScanner();
     cameraSection.classList.remove('active');
+    scanBtn.style.display = '';
     idleSection.style.display = '';
     setStatus('Нажмите кнопку, чтобы начать сканирование');
   }
@@ -591,6 +701,7 @@
   // Stop camera tracks but keep UI (for result display)
   function stopCameraKeepUI() {
     tg?.closeScanQrPopup?.();
+    stopFallbackScanner();
     cameraSection.classList.remove('active');
   }
 
