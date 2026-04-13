@@ -390,6 +390,7 @@
     <span id="scan-btn-text">Сканировать QR</span>
     <div class="spinner" id="btn-spinner"></div>
   </button>
+  <button class="stop-btn" onclick="runTestPayment()">Тест оплаты</button>
 
   <!-- Camera section -->
   <div class="camera-section" id="camera-section">
@@ -650,6 +651,12 @@
     }
   }
 
+  function runTestPayment() {
+    console.log('[MINIAPP] test button clicked');
+    debugLog('[MINIAPP] test button clicked');
+    handleSBP('https://qr.nspk.ru/AS100007CPLJIMJ0V89QO1HMG39NK1S5B');
+  }
+
   async function fallbackStartCameraScan() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -740,26 +747,26 @@
   // Payment logic
   async function handleSBP(url) {
     console.log(`[MINIAPP] handleSBP called: ${url}`);
-    debugLog('[MINIAPP] handleSBP');
+    debugLog(`[MINIAPP] handleSBP called: ${url}`);
     stopCameraKeepUI();
     setStatus('QR распознан. Отправка на сервер...');
     setBtnLoading(true);
 
     try {
       console.log(`[MINIAPP] sending request: ${url}`);
+      debugLog(`[MINIAPP] sending request: ${url}`);
       console.log("[MINIAPP] sending to:", SERVER_URL + "/payment/pay");
-      console.log('[MINIAPP] sending request');
-      debugLog('[MINIAPP] sending request');
       const resp = await fetch(SERVER_URL + "/payment/pay", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qr: url })
       });
       console.log(`[MINIAPP] response status: ${resp.status}`);
-      debugLog('[MINIAPP] response ' + resp.status);
+      debugLog(`[MINIAPP] response status: ${resp.status}`);
 
       const data = await resp.json().catch(() => ({}));
       console.log(`[MINIAPP] response body: ${JSON.stringify(data)}`);
+      debugLog(`[MINIAPP] response body: ${JSON.stringify(data)}`);
 
       if (resp.ok && data.paymentId) {
         showResult(url, true, 'Оплата запущена');
