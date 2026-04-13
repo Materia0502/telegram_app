@@ -391,6 +391,7 @@
     <div class="spinner" id="btn-spinner"></div>
   </button>
   <button class="stop-btn" id="testPayBtn" onclick="runTestPayment()">Тест оплаты</button>
+  <button class="stop-btn" id="testHealthBtn" onclick="runHealthCheck()">Тест сети</button>
 
   <!-- Camera section -->
   <div class="camera-section" id="camera-section">
@@ -438,7 +439,7 @@
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
-  const SERVER_URL = "https://transport-flexible-basin-poor.trycloudflare.com";
+  const SERVER_URL = "https://spoke-expired-leading-solaris.trycloudflare.com";
   // DOM refs
   const scanBtn        = document.getElementById('scanBtn');
   const scanBtnText    = document.getElementById('scan-btn-text');
@@ -655,6 +656,24 @@
     console.log('[MINIAPP] test button clicked');
     debugLog('[MINIAPP] test button clicked');
     handleSBP('https://qr.nspk.ru/AS100007CPLJIMJ0V89QO1HMG39NK1S5B');
+  }
+
+  async function runHealthCheck() {
+    console.log('[MINIAPP] health check started');
+    debugLog('[MINIAPP] health check started');
+
+    try {
+      const resp = await fetch(SERVER_URL + '/health');
+      console.log(`[MINIAPP] health status: ${resp.status}`);
+      debugLog(`[MINIAPP] health status: ${resp.status}`);
+
+      const body = await resp.text();
+      console.log(`[MINIAPP] health body: ${body}`);
+      debugLog(`[MINIAPP] health body: ${body}`);
+    } catch (err) {
+      console.error('[MINIAPP] health error:', err);
+      debugLog('[MINIAPP] health error: ' + (err?.message || String(err)));
+    }
   }
 
   async function fallbackStartCameraScan() {
