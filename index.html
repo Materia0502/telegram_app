@@ -685,7 +685,11 @@
 
     try {
       debugLog('[MINIAPP] health url: ' + SERVER_URL + '/health');
-      const resp = await fetch(SERVER_URL + '/health');
+      debugLog('[MINIAPP] using no-cors GET request');
+      const resp = await fetch(SERVER_URL + '/health', {
+        method: "GET",
+        mode: "no-cors"
+      });
       console.log(`[MINIAPP] health status: ${resp.status}`);
       debugLog(`[MINIAPP] health status: ${resp.status}`);
 
@@ -823,10 +827,10 @@
       debugLog(`[MINIAPP] sending request: ${url}`);
       debugLog('[MINIAPP] payment url: ' + SERVER_URL + '/payment/pay');
 
-      const resp = await fetch(SERVER_URL + "/payment/pay", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qr: url })
+      debugLog('[MINIAPP] using no-cors GET request');
+      const resp = await fetch(SERVER_URL + "/payment/pay?qr=" + encodeURIComponent(url), {
+        method: "GET",
+        mode: "no-cors"
       });
 
       console.log(`[MINIAPP] response status: ${resp.status}`);
