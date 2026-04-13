@@ -748,19 +748,45 @@
   async function handleSBP(url) {
     console.log(`[MINIAPP] handleSBP called: ${url}`);
     debugLog(`[MINIAPP] handleSBP called: ${url}`);
-    stopCameraKeepUI();
-    setStatus('QR распознан. Отправка на сервер...');
-    setBtnLoading(true);
 
     try {
+      debugLog('[MINIAPP] handleSBP entered');
+
+      debugLog('[MINIAPP] before stopCameraKeepUI');
+      try {
+        stopCameraKeepUI();
+      } catch (err) {
+        console.error('[MINIAPP] stopCameraKeepUI error:', err);
+        debugLog('[MINIAPP] stopCameraKeepUI error: ' + (err?.message || String(err)));
+      }
+      debugLog('[MINIAPP] after stopCameraKeepUI');
+
+      try {
+        setStatus('QR распознан. Отправка на сервер...');
+      } catch (err) {
+        console.error('[MINIAPP] setStatus error:', err);
+        debugLog('[MINIAPP] setStatus error: ' + (err?.message || String(err)));
+      }
+      debugLog('[MINIAPP] after setStatus');
+
+      try {
+        setBtnLoading(true);
+      } catch (err) {
+        console.error('[MINIAPP] setBtnLoading error:', err);
+        debugLog('[MINIAPP] setBtnLoading error: ' + (err?.message || String(err)));
+      }
+      debugLog('[MINIAPP] after setBtnLoading');
+
+      debugLog('[MINIAPP] before fetch');
       console.log(`[MINIAPP] sending request: ${url}`);
       debugLog(`[MINIAPP] sending request: ${url}`);
-      console.log("[MINIAPP] sending to:", SERVER_URL + "/payment/pay");
+
       const resp = await fetch(SERVER_URL + "/payment/pay", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qr: url })
       });
+
       console.log(`[MINIAPP] response status: ${resp.status}`);
       debugLog(`[MINIAPP] response status: ${resp.status}`);
 
@@ -769,32 +795,81 @@
       debugLog(`[MINIAPP] response body: ${JSON.stringify(data)}`);
 
       if (resp.ok && data.paymentId) {
-        showResult(url, true, 'Оплата запущена');
-        setStatus('Оплата запущена', 'success');
+        try {
+          showResult(url, true, 'Оплата запущена');
+        } catch (err) {
+          console.error('[MINIAPP] showResult success error:', err);
+          debugLog('[MINIAPP] showResult success error: ' + (err?.message || String(err)));
+        }
 
-        // Telegram MainButton
-        if (tg?.MainButton) {
-          tg.MainButton.setText('Готово');
-          tg.MainButton.show();
-          tg.MainButton.onClick(() => tg.close());
+        try {
+          setStatus('Оплата запущена', 'success');
+        } catch (err) {
+          console.error('[MINIAPP] setStatus success error:', err);
+          debugLog('[MINIAPP] setStatus success error: ' + (err?.message || String(err)));
+        }
+
+        try {
+          if (tg?.MainButton) {
+            tg.MainButton.setText('Готово');
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => tg.close());
+          }
+        } catch (err) {
+          console.error('[MINIAPP] MainButton error:', err);
+          debugLog('[MINIAPP] MainButton error: ' + (err?.message || String(err)));
         }
       } else {
         const errorMessage = data.error || 'Ошибка сервера';
-        showResult(url, false, errorMessage);
-        setStatus(errorMessage, 'error');
+
+        try {
+          showResult(url, false, errorMessage);
+        } catch (err) {
+          console.error('[MINIAPP] showResult error error:', err);
+          debugLog('[MINIAPP] showResult error error: ' + (err?.message || String(err)));
+        }
+
+        try {
+          setStatus(errorMessage, 'error');
+        } catch (err) {
+          console.error('[MINIAPP] setStatus error state error:', err);
+          debugLog('[MINIAPP] setStatus error state error: ' + (err?.message || String(err)));
+        }
       }
     } catch (err) {
-      console.error('Payment error:', err);
-      console.log('[MINIAPP] payment error');
-      debugLog('[MINIAPP] network error');
-      showResult(url, false, 'Ошибка сети');
-      setStatus('Ошибка сети', 'error');
-    }
+      console.error('[MINIAPP] handleSBP outer error:', err);
+      debugLog('[MINIAPP] handleSBP outer error: ' + (err?.message || String(err)));
 
-    setBtnLoading(false);
-    scanBtn.style.display = '';
-    scanBtnText.textContent = 'Сканировать снова';
-    idleSection.style.display = 'none';
+      try {
+        showResult(url, false, 'Ошибка сети');
+      } catch (innerErr) {
+        console.error('[MINIAPP] showResult outer catch error:', innerErr);
+        debugLog('[MINIAPP] showResult outer catch error: ' + (innerErr?.message || String(innerErr)));
+      }
+
+      try {
+        setStatus('Ошибка сети', 'error');
+      } catch (innerErr) {
+        console.error('[MINIAPP] setStatus outer catch error:', innerErr);
+        debugLog('[MINIAPP] setStatus outer catch error: ' + (innerErr?.message || String(innerErr)));
+      }
+    } finally {
+      try {
+        setBtnLoading(false);
+      } catch (err) {
+        console.error('[MINIAPP] setBtnLoading(false) error:', err);
+        debugLog('[MINIAPP] setBtnLoading(false) error: ' + (err?.message || String(err)));
+      }
+
+      try {
+        scanBtn.style.display = '';
+        scanBtnText.textContent = 'Сканировать снова';
+        idleSection.style.display = 'none';
+      } catch (err) {
+        console.error('[MINIAPP] final UI error:', err);
+        debugLog('[MINIAPP] final UI error: ' + (err?.message || String(err)));
+      }
+    }
   }
 
   // Stop camera tracks but keep UI (for result display)
