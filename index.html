@@ -78,6 +78,19 @@
       color: var(--tg-theme-hint-color);
     }
 
+    .version-debug {
+      width: calc(100% - 40px);
+      max-width: 480px;
+      margin: 12px 20px 0;
+      padding: 10px 12px;
+      background: #fff3cd;
+      border: 1px solid #f0d98a;
+      border-radius: 12px;
+      font-size: 12px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
     /* Main content */
     .content {
       width: 100%;
@@ -356,6 +369,11 @@
   </div>
 </div>
 
+<div class="version-debug">
+  <div>VERSION: 9019</div>
+  <div>SERVER_URL: https://calculators-myth-folding-portfolio.trycloudflare.com</div>
+</div>
+
 <!-- Main content -->
 <div class="content">
 
@@ -439,7 +457,9 @@
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
+  const APP_VERSION = "9019";
   const SERVER_URL = "https://calculators-myth-folding-portfolio.trycloudflare.com";
+  debugLog('[MINIAPP] APP_VERSION: ' + APP_VERSION);
   debugLog('[MINIAPP] SERVER_URL: ' + SERVER_URL);
   // DOM refs
   const scanBtn        = document.getElementById('scanBtn');
