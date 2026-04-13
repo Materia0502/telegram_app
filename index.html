@@ -370,7 +370,7 @@
 </div>
 
 <div class="version-debug">
-  <div>VERSION: 9019</div>
+  <div>VERSION: 9020</div>
   <div>SERVER_URL: https://calculators-myth-folding-portfolio.trycloudflare.com</div>
 </div>
 
@@ -457,7 +457,7 @@
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
-  const APP_VERSION = "9019";
+  const APP_VERSION = "9020";
   const SERVER_URL = "https://calculators-myth-folding-portfolio.trycloudflare.com";
   debugLog('[MINIAPP] APP_VERSION: ' + APP_VERSION);
   debugLog('[MINIAPP] SERVER_URL: ' + SERVER_URL);
@@ -685,7 +685,7 @@
 
     try {
       debugLog('[MINIAPP] health url: ' + SERVER_URL + '/health');
-      debugLog('[MINIAPP] using no-cors GET request');
+      debugLog('[MINIAPP] using no-cors GET request for health');
       const resp = await fetch(SERVER_URL + '/health', {
         method: "GET",
         mode: "no-cors"
@@ -827,7 +827,7 @@
       debugLog(`[MINIAPP] sending request: ${url}`);
       debugLog('[MINIAPP] payment url: ' + SERVER_URL + '/payment/pay');
 
-      debugLog('[MINIAPP] using no-cors GET request');
+      debugLog('[MINIAPP] using no-cors GET request for payment');
       const resp = await fetch(SERVER_URL + "/payment/pay?qr=" + encodeURIComponent(url), {
         method: "GET",
         mode: "no-cors"
