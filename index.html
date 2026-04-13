@@ -437,7 +437,7 @@
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
-  const SERVER_URL = 'https://break-issued-conversation-securities.trycloudflare.com';
+  const SERVER_URL = "https://YOUR_TUNNEL_URL";
   const SCAN_INTERVAL_MS = 200;
 
   // DOM refs
@@ -657,9 +657,10 @@
     setBtnLoading(true);
 
     try {
+      console.log("[MINIAPP] sending to:", SERVER_URL + "/payment/pay");
       console.log('[MINIAPP] sending request');
       debugLog('[MINIAPP] sending request');
-      const resp = await fetch(`${SERVER_URL}/payment/pay`, {
+      const resp = await fetch(SERVER_URL + "/payment/pay", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrUrl: url })
