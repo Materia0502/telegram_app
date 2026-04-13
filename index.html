@@ -440,6 +440,7 @@
   // Constants
   // заменить на актуальный URL backend (cloudflared)
   const SERVER_URL = "https://calculators-myth-folding-portfolio.trycloudflare.com";
+  debugLog('[MINIAPP] SERVER_URL: ' + SERVER_URL);
   // DOM refs
   const scanBtn        = document.getElementById('scanBtn');
   const scanBtnText    = document.getElementById('scan-btn-text');
@@ -663,6 +664,7 @@
     debugLog('[MINIAPP] health check started');
 
     try {
+      debugLog('[MINIAPP] health url: ' + SERVER_URL + '/health');
       const resp = await fetch(SERVER_URL + '/health');
       console.log(`[MINIAPP] health status: ${resp.status}`);
       debugLog(`[MINIAPP] health status: ${resp.status}`);
@@ -799,6 +801,7 @@
       debugLog('[MINIAPP] before fetch');
       console.log(`[MINIAPP] sending request: ${url}`);
       debugLog(`[MINIAPP] sending request: ${url}`);
+      debugLog('[MINIAPP] payment url: ' + SERVER_URL + '/payment/pay');
 
       const resp = await fetch(SERVER_URL + "/payment/pay", {
         method: 'POST',
