@@ -438,8 +438,6 @@
   // Constants
   // заменить на актуальный URL backend (cloudflared)
   const SERVER_URL = "https://inflation-shanghai-museum-soldier.trycloudflare.com";
-  const SCAN_INTERVAL_MS = 200;
-
   // DOM refs
   const scanBtn        = document.getElementById('scanBtn');
   const scanBtnText    = document.getElementById('scan-btn-text');
@@ -455,7 +453,8 @@
   const idleSection    = document.getElementById('idle-section');
 
   let stream = null;
-  let scanTimer = null;
+  let scanRaf = null;
+  let scanBusy = false;
   let fallbackActive = false;
   let barcodeDetector = null;
   let fallbackCanvas = null;
@@ -500,8 +499,9 @@
 
   function stopFallbackScanner() {
     fallbackActive = false;
-    clearInterval(scanTimer);
-    scanTimer = null;
+    cancelAnimationFrame(scanRaf);
+    scanRaf = null;
+    scanBusy = false;
 
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
@@ -510,6 +510,36 @@
 
     videoEl.srcObject = null;
     videoWrapper.classList.remove('scanning');
+  }
+
+  function scanLoop() {
+    if (!fallbackActive) return;
+
+    scanRaf = requestAnimationFrame(scanLoop);
+
+    if (scanBusy) return;
+    scanBusy = true;
+
+    try {
+      scanWithJsQr();
+    } finally {
+      scanBusy = false;
+    }
+  }
+
+  function scanBarcodeLoop() {
+    if (!fallbackActive || !barcodeDetector) return;
+
+    scanRaf = requestAnimationFrame(scanBarcodeLoop);
+
+    if (scanBusy) return;
+    scanBusy = true;
+
+    try {
+      scanWithBarcodeDetector();
+    } finally {
+      scanBusy = false;
+    }
   }
 
   function onQrDetected(qrText) {
@@ -546,16 +576,75 @@
       fallbackCtx = fallbackCanvas.getContext('2d', { willReadFrequently: true });
     }
 
-    fallbackCanvas.width = videoEl.videoWidth;
-    fallbackCanvas.height = videoEl.videoHeight;
-    fallbackCtx.drawImage(videoEl, 0, 0, fallbackCanvas.width, fallbackCanvas.height);
+    const width = videoEl.videoWidth;
+    const height = videoEl.videoHeight;
+    if (!width || !height) return;
 
-    const imageData = fallbackCtx.getImageData(0, 0, fallbackCanvas.width, fallbackCanvas.height);
-    const code = window.jsQR?.(imageData.data, imageData.width, imageData.height, {
+    fallbackCanvas.width = width;
+    fallbackCanvas.height = height;
+    fallbackCtx.drawImage(videoEl, 0, 0, width, height);
+
+    const originalImageData = fallbackCtx.getImageData(0, 0, width, height);
+
+    let code = window.jsQR?.(originalImageData.data, width, height, {
       inversionAttempts: 'attemptBoth'
     });
 
+    if (!code) {
+      const grayscaleImageData = new ImageData(
+        new Uint8ClampedArray(originalImageData.data),
+        width,
+        height
+      );
+
+      for (let i = 0; i < grayscaleImageData.data.length; i += 4) {
+        const r = grayscaleImageData.data[i];
+        const g = grayscaleImageData.data[i + 1];
+        const b = grayscaleImageData.data[i + 2];
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        grayscaleImageData.data[i] = gray;
+        grayscaleImageData.data[i + 1] = gray;
+        grayscaleImageData.data[i + 2] = gray;
+      }
+
+      code = window.jsQR?.(grayscaleImageData.data, width, height, {
+        inversionAttempts: 'attemptBoth'
+      });
+
+      if (!code) {
+        const thresholdImageData = new ImageData(
+          new Uint8ClampedArray(grayscaleImageData.data),
+          width,
+          height
+        );
+
+        let totalGray = 0;
+        let pixels = 0;
+
+        for (let i = 0; i < thresholdImageData.data.length; i += 4) {
+          totalGray += thresholdImageData.data[i];
+          pixels++;
+        }
+
+        const averageGray = pixels ? totalGray / pixels : 128;
+        const threshold = Math.max(90, Math.min(180, averageGray));
+
+        for (let i = 0; i < thresholdImageData.data.length; i += 4) {
+          const value = thresholdImageData.data[i] > threshold ? 255 : 0;
+          thresholdImageData.data[i] = value;
+          thresholdImageData.data[i + 1] = value;
+          thresholdImageData.data[i + 2] = value;
+        }
+
+        code = window.jsQR?.(thresholdImageData.data, width, height, {
+          inversionAttempts: 'attemptBoth'
+        });
+      }
+    }
+
     if (code?.data) {
+      console.log('[MINIAPP] jsQR detected:', code.data);
       debugLog('[MINIAPP] jsQR detected: ' + code.data);
       onQrDetected(code.data);
     }
@@ -583,11 +672,11 @@
 
       if (typeof window.BarcodeDetector !== 'undefined') {
         barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
-        scanTimer = setInterval(scanWithBarcodeDetector, SCAN_INTERVAL_MS);
+        scanBarcodeLoop();
       } else {
         barcodeDetector = null;
         debugLog('[MINIAPP] jsQR fallback active');
-        scanTimer = setInterval(scanWithJsQr, SCAN_INTERVAL_MS);
+        scanLoop();
       }
     } catch (err) {
       debugLog('[MINIAPP] fallback camera error: ' + (err?.message || String(err)));
@@ -657,18 +746,20 @@
     setBtnLoading(true);
 
     try {
+      console.log(`[MINIAPP] sending request: ${url}`);
       console.log("[MINIAPP] sending to:", SERVER_URL + "/payment/pay");
       console.log('[MINIAPP] sending request');
       debugLog('[MINIAPP] sending request');
       const resp = await fetch(SERVER_URL + "/payment/pay", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qrUrl: url })
+        body: JSON.stringify({ qr: url })
       });
       console.log(`[MINIAPP] response status: ${resp.status}`);
       debugLog('[MINIAPP] response ' + resp.status);
 
       const data = await resp.json().catch(() => ({}));
+      console.log(`[MINIAPP] response body: ${JSON.stringify(data)}`);
 
       if (resp.ok && data.paymentId) {
         showResult(url, true, 'Оплата запущена');
