@@ -457,8 +457,8 @@
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
-  const APP_VERSION = "10004";
-  const SERVER_URL = "https://lovely-phones-remain.loca.lt";
+  const APP_VERSION = "10005";
+  const SERVER_URL = "https://sbp-relay-production.up.railway.app";
   debugLog('[MINIAPP] APP_VERSION: ' + APP_VERSION);
   debugLog('[MINIAPP] SERVER_URL: ' + SERVER_URL);
   document.getElementById('version-line').textContent = 'VERSION: ' + APP_VERSION;
@@ -687,23 +687,15 @@
 
     try {
       debugLog('[MINIAPP] health url: ' + SERVER_URL + '/health');
-      debugLog('[MINIAPP] using no-cors GET request for health');
-      const resp = await fetch(SERVER_URL + '/health', {
-        method: "GET",
-        mode: "no-cors"
-      });
+      debugLog('[MINIAPP] sending health request');
+      const resp = await fetch(SERVER_URL + '/health');
       console.log(`[MINIAPP] health status: ${resp.status}`);
       debugLog(`[MINIAPP] health status: ${resp.status}`);
-
-      if (resp.type === 'opaque' || resp.status === 0) {
-        debugLog('[MINIAPP] health request sent (opaque no-cors response)');
-        setStatus('Запрос сети отправлен', 'success');
-        return;
-      }
 
       const body = await resp.text();
       console.log(`[MINIAPP] health body: ${body}`);
       debugLog(`[MINIAPP] health body: ${body}`);
+      setStatus(resp.ok ? 'Сервер доступен' : 'Ошибка сервера: ' + resp.status, resp.ok ? 'success' : 'error');
     } catch (err) {
       console.error('[MINIAPP] health error:', err);
       debugLog('[MINIAPP] health error: ' + (err?.message || String(err)));
@@ -835,34 +827,17 @@
       debugLog(`[MINIAPP] sending request: ${url}`);
       debugLog('[MINIAPP] payment url: ' + SERVER_URL + '/payment/pay');
 
-      debugLog('[MINIAPP] using no-cors GET request for payment');
-      const resp = await fetch(SERVER_URL + "/payment/pay?qr=" + encodeURIComponent(url), {
-        method: "GET",
-        mode: "no-cors"
-      });
+      debugLog('[MINIAPP] sending payment request');
+      const resp = await fetch(SERVER_URL + "/payment/pay?qr=" + encodeURIComponent(url));
 
       console.log(`[MINIAPP] response status: ${resp.status}`);
       debugLog(`[MINIAPP] response status: ${resp.status}`);
-
-      if (resp.type === 'opaque' || resp.status === 0) {
-        debugLog('[MINIAPP] payment request sent (opaque no-cors response)');
-        showResult(url, true, 'Запрос отправлен');
-        setStatus('Запрос на оплату отправлен', 'success');
-
-        if (tg?.MainButton) {
-          tg.MainButton.setText('Готово');
-          tg.MainButton.show();
-          tg.MainButton.onClick(() => tg.close());
-        }
-
-        return;
-      }
 
       const data = await resp.json().catch(() => ({}));
       console.log(`[MINIAPP] response body: ${JSON.stringify(data)}`);
       debugLog(`[MINIAPP] response body: ${JSON.stringify(data)}`);
 
-      if (resp.ok && data.paymentId) {
+      if (resp.ok && data.success) {
         try {
           showResult(url, true, 'Оплата запущена');
         } catch (err) {
