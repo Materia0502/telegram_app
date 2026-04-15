@@ -457,7 +457,7 @@
 
   // Constants
   // заменить на актуальный URL backend (cloudflared)
-  const APP_VERSION = "10001";
+  const APP_VERSION = "10002";
   const SERVER_URL = "https://ict-exists-versus-famous.trycloudflare.com";
   debugLog('[MINIAPP] APP_VERSION: ' + APP_VERSION);
   debugLog('[MINIAPP] SERVER_URL: ' + SERVER_URL);
@@ -695,6 +695,12 @@
       console.log(`[MINIAPP] health status: ${resp.status}`);
       debugLog(`[MINIAPP] health status: ${resp.status}`);
 
+      if (resp.type === 'opaque' || resp.status === 0) {
+        debugLog('[MINIAPP] health request sent (opaque no-cors response)');
+        setStatus('Запрос сети отправлен', 'success');
+        return;
+      }
+
       const body = await resp.text();
       console.log(`[MINIAPP] health body: ${body}`);
       debugLog(`[MINIAPP] health body: ${body}`);
@@ -837,6 +843,20 @@
 
       console.log(`[MINIAPP] response status: ${resp.status}`);
       debugLog(`[MINIAPP] response status: ${resp.status}`);
+
+      if (resp.type === 'opaque' || resp.status === 0) {
+        debugLog('[MINIAPP] payment request sent (opaque no-cors response)');
+        showResult(url, true, 'Запрос отправлен');
+        setStatus('Запрос на оплату отправлен', 'success');
+
+        if (tg?.MainButton) {
+          tg.MainButton.setText('Готово');
+          tg.MainButton.show();
+          tg.MainButton.onClick(() => tg.close());
+        }
+
+        return;
+      }
 
       const data = await resp.json().catch(() => ({}));
       console.log(`[MINIAPP] response body: ${JSON.stringify(data)}`);
